@@ -1,0 +1,345 @@
+/* stylelint-disable-next-line */
+@tailwind base;
+/* stylelint-disable-next-line unknownAtRules */
+@tailwind components;
+/* stylelint-disable-next-line */
+@tailwind utilities;
+
+:root {
+  --primary: #6C3AFF;
+  --primary-dark: #4F1FE8;
+  --accent: #FF6B35;
+  --success: #00D4AA;
+  --warning: #FFB800;
+  --dark: #0D0D0D;
+
+  --card-bg: rgba(255, 255, 255, 0.04);
+  --border: rgba(255, 255, 255, 0.08);
+
+  --text-primary: #F5F5F5;
+  --text-muted: #8B8B9E;
+
+  --background: var(--dark);
+  --foreground: var(--text-primary);
+}
+
+
+body {
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--background);
+  color: var(--foreground);
+  min-height: 100vh;
+}
+
+input,
+select,
+button {
+  outline: none;
+}
+
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translate3d(0, -18px, 0) rotate(10deg);
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%) skewX(-15deg);
+  }
+  100% {
+    transform: translateX(200%) skewX(-15deg);
+  }
+}
+
+
+
+@keyframes glow {
+  0%,
+  100% {
+    opacity: 0.38;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.64;
+    transform: scale(1.03);
+  }
+}
+
+@keyframes pulseDot {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.4);
+    opacity: 1;
+  }
+}
+
+@keyframes typewriter {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+@keyframes shimmerSweep {
+  0% {
+    transform: translateX(-100%) skewX(-15deg);
+  }
+  100% {
+    transform: translateX(200%) skewX(-15deg);
+  }
+}
+
+@keyframes gradientBorder {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.glass-card {
+  background: var(--card-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text; /* standard property for compatibility */
+  -webkit-text-fill-color: transparent;
+  color: transparent; /* fallback for non-webkit browsers */
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  position: relative;
+  overflow: hidden;
+}
+.btn-primary::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 40%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateX(-100%) skewX(-15deg);
+}
+.btn-primary:hover::after {
+  animation: shimmer 0.6s ease forwards;
+}
+
+
+.auth-shell {
+  position: relative;
+  overflow: hidden;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(56, 189, 248, 0.24), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.22), transparent 30%),
+    linear-gradient(135deg, #020617 0%, #07111f 48%, #0b1220 100%);
+}
+
+.auth-shell__grid {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(circle at center, black 32%, transparent 100%);
+  opacity: 0.25;
+}
+
+.auth-shell__glow {
+  pointer-events: none;
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(60px);
+  animation: glow 8s ease-in-out infinite;
+}
+
+.auth-shell__glow--one {
+  left: -5rem;
+  top: 10%;
+  height: 18rem;
+  width: 18rem;
+  background: rgba(34, 211, 238, 0.16);
+}
+
+.auth-shell__glow--two {
+  right: -4rem;
+  bottom: 8%;
+  height: 20rem;
+  width: 20rem;
+  background: rgba(37, 99, 235, 0.16);
+  animation-delay: -2s;
+}
+
+.auth-shell__orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(48px);
+  animation: float 7s ease-in-out infinite;
+}
+
+.auth-shell__orb--one {
+  left: -1rem;
+  top: 4rem;
+  height: 8rem;
+  width: 8rem;
+  background: rgba(34, 211, 238, 0.18);
+}
+
+.auth-shell__orb--two {
+  right: 2rem;
+  bottom: 5rem;
+  height: 10rem;
+  width: 10rem;
+  background: rgba(59, 130, 246, 0.16);
+  animation-delay: -3s;
+}
+
+.auth-card {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 30px 120px rgba(2, 6, 23, 0.6);
+}
+
+.auth-card__accent {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at top right, rgba(34, 211, 238, 0.12), transparent 20%),
+    radial-gradient(circle at left bottom, rgba(59, 130, 246, 0.1), transparent 26%);
+}
+
+.animate-float {
+  animation: float 7s ease-in-out infinite;
+}
+
+.animate-float-slow {
+  animation: float 11s ease-in-out infinite;
+}
+
+.animate-glow {
+  animation: glow 7s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  animation: shimmer 2.25s linear infinite;
+}
+
+.animate-rise {
+  animation: rise 0.45s ease-out both;
+}
+
+/* ANIMATION: pulse dot (workspace status badge) */
+.pulse-dot {
+  animation: pulseDot 1.6s ease-in-out infinite;
+}
+
+@keyframes orbFloat1 {
+  0%, 100% { transform: translate(0px, 0px) scale(1); }
+  33% { transform: translate(30px, -50px) scale(1.1); }
+  66% { transform: translate(-20px, 20px) scale(0.9); }
+}
+
+@keyframes orbFloat2 {
+  0%, 100% { transform: translate(0px, 0px) scale(1); }
+  33% { transform: translate(-40px, 30px) scale(1.05); }
+  66% { transform: translate(20px, -30px) scale(0.95); }
+}
+
+@keyframes orbFloat3 {
+  0%, 100% { transform: translate(0px, 0px); }
+  50% { transform: translate(25px, 40px) scale(1.08); }
+}
+
+@keyframes gridMove {
+  0% { transform: translateY(0px); }
+  100% { transform: translateY(40px); }
+}
+
+@keyframes shimmerBg {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes cardPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(124,58,237,0); }
+  50% { box-shadow: 0 0 20px 2px rgba(124,58,237,0.1); }
+}
+
+@keyframes orbFloat1 {
+  0%, 100% { transform: translate(0px, 0px) scale(1); }
+  33% { transform: translate(30px, -50px) scale(1.1); }
+  66% { transform: translate(-20px, 20px) scale(0.9); }
+}
+
+@keyframes orbFloat2 {
+  0%, 100% { transform: translate(0px, 0px) scale(1); }
+  33% { transform: translate(-40px, 30px) scale(1.05); }
+  66% { transform: translate(20px, -30px) scale(0.95); }
+}
+
+@keyframes orbFloat3 {
+  0%, 100% { transform: translate(0px, 0px) scale(1); }
+  50% { transform: translate(25px, 40px) scale(1.08); }
+}
+
+@keyframes gridMove {
+  0% { transform: translateY(0px); }
+  100% { transform: translateY(40px); }
+}
+
+@keyframes shimmerBg {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}

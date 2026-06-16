@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id            Int              @id @default(autoincrement())
+  name          String
+  slug          String           @unique
+  status        String           @default("active")
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  users         User[]
+  subscriptions Subscription[]
+  members       Member[]
+  plans         MembershipPlan[]
+  memberships   MemberMembership[]
+  payments      Payment[]
+  attendance    Attendance[]
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  tenantId     Int
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("owner")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+model Subscription {
+  id          Int      @id @default(autoincrement())
+  tenantId    Int
+  planName    String   @default("starter")
+  status      String   @default("trial")
+  trialEndsAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+model Member {
+  id          Int      @id @default(autoincrement())
+  tenantId    Int
+  name        String
+  phone       String
+  email       String?
+  gender      String?
+  status      String   @default("active")
+  joiningDate DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  memberships MemberMembership[]
+  payments    Payment[]
+  attendance  Attendance[]
+
+  @@index([tenantId])
+}
+
+model MembershipPlan {
+  id           Int      @id @default(autoincrement())
+  tenantId     Int
+  name         String
+  durationDays Int
+  price        Decimal  @db.Decimal(10, 2)
+  status       String   @default("active")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  memberships  MemberMembership[]
+
+  @@index([tenantId])
+}
+
+model MemberMembership {
+  id        Int      @id @default(autoincrement())
+  tenantId  Int
+  memberId  Int
+  planId    Int
+  startDate DateTime
+  endDate   DateTime
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member    Member         @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  plan      MembershipPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([memberId])
+  @@index([planId])
+}
+
+model Payment {
+  id            Int      @id @default(autoincrement())
+  tenantId      Int
+  memberId      Int
+  amount        Decimal  @db.Decimal(10, 2)
+  paymentMethod String   @default("cash")
+  paymentStatus String   @default("paid")
+  paidAt        DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member        Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([memberId])
+}
+
+model Attendance {
+  id        Int      @id @default(autoincrement())
+  tenantId  Int
+  memberId  Int
+  checkInAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([memberId])
+}

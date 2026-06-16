@@ -1,0 +1,24 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="10" y1="8" x2="54" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22D3EE" />
+      <stop offset="0.5" stop-color="#2563EB" />
+      <stop offset="1" stop-color="#4F46E5" />
+    </linearGradient>
+    <linearGradient id="shine" x1="18" y1="16" x2="46" y2="52" gradientUnits="userSpaceOnUse">
+      <stop stop-color="white" stop-opacity="0.65" />
+      <stop offset="1" stop-color="white" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#bg)" />
+  <path
+    d="M20 22.5C20 20.567 21.567 19 23.5 19H40.5C42.433 19 44 20.567 44 22.5C44 24.433 42.433 26 40.5 26H28V38.5C28 40.433 26.433 42 24.5 42C22.567 42 21 40.433 21 38.5V23.5C21 22.9477 20.5523 22.5 20 22.5Z"
+    fill="white"
+  />
+  <path
+    d="M28 31C28 29.3431 29.3431 28 31 28H40.5C42.433 28 44 29.567 44 31.5C44 33.433 42.433 35 40.5 35H35V40.5C35 42.433 33.433 44 31.5 44C29.567 44 28 42.433 28 40.5V31Z"
+    fill="white"
+    opacity="0.88"
+  />
+  <rect x="10" y="10" width="44" height="44" rx="12" stroke="url(#shine)" stroke-width="1.2" />
+</svg>
