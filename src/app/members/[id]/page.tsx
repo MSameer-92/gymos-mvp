@@ -50,10 +50,47 @@ async function assignOrRenewPlan(formData: FormData) {
     },
   });
 
+  await prisma.member.updateMany({
+    where: { id: member.id, tenantId: user.tenantId },
+    data: { status: "active" },
+  });
+
   revalidatePath(`/members/${member.id}`);
   revalidatePath("/members");
   revalidatePath("/dashboard");
   revalidatePath("/plans");
+  redirect(`/members/${member.id}`);
+}
+
+async function markAttendance(formData: FormData) {
+  "use server";
+
+  const user = await requireUser();
+  const memberId = Number(formData.get("memberId"));
+
+  if (!memberId) {
+    redirect(`/members/${memberId}`);
+  }
+
+  const member = await prisma.member.findFirst({
+    where: { id: memberId, tenantId: user.tenantId },
+    select: { id: true },
+  });
+
+  if (!member) {
+    notFound();
+  }
+
+  await prisma.attendance.create({
+    data: {
+      tenantId: user.tenantId,
+      memberId: member.id,
+    },
+  });
+
+  revalidatePath(`/members/${member.id}`);
+  revalidatePath("/attendance");
+  revalidatePath("/dashboard");
   redirect(`/members/${member.id}`);
 }
 
@@ -179,13 +216,6 @@ export default async function MemberDetailPage({
             <CreditCard className="h-4 w-4" />
             Record Payment
           </Link>
-          <Link
-            href={`/attendance?memberId=${member.id}`}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 text-sm font-semibold text-gray-200 transition-colors hover:bg-gray-800"
-          >
-            <UserCheck className="h-4 w-4" />
-            Mark Attendance
-          </Link>
           <a
             href="#assign-plan"
             className="inline-flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 text-sm font-semibold text-gray-200 transition-colors hover:bg-gray-800"
@@ -193,6 +223,16 @@ export default async function MemberDetailPage({
             <Medal className="h-4 w-4" />
             Assign / Renew Plan
           </a>
+          <form action={markAttendance}>
+            <input type="hidden" name="memberId" value={member.id} />
+            <button
+              type="submit"
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 text-sm font-semibold text-gray-200 transition-colors hover:bg-gray-800"
+            >
+              <UserCheck className="h-4 w-4" />
+              Mark Attendance
+            </button>
+          </form>
         </div>
       </div>
 
