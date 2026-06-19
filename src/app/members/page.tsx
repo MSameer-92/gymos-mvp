@@ -30,7 +30,7 @@ export default async function MembersPage() {
   });
 
   return (
-    <div className="relative z-10 min-h-screen bg-transparent p-6 -m-6 space-y-8">
+    <div className="w-full space-y-8">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-white">Members</h1>
@@ -41,10 +41,12 @@ export default async function MembersPage() {
 
       <div className="space-y-8">
         {/* Add Member Form */}
-        <MemberForm />
+        <div className="w-full rounded-3xl border border-white/10 bg-slate-900/70 p-6 shadow-2xl shadow-black/30">
+          <MemberForm />
+        </div>
 
         {/* Members Table */}
-        <div className="rounded-xl border border-gray-800 bg-gray-900 shadow-none overflow-hidden">
+        <div className="w-full overflow-hidden rounded-3xl border border-white/10 bg-slate-900/70 shadow-2xl shadow-black/30">
           {members.length === 0 ? (
             <div className="flex flex-col items-center justify-center px-6 py-12">
               <Users className="h-12 w-12 text-gray-300 mb-4" />
@@ -54,8 +56,8 @@ export default async function MembersPage() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
+            <div className="w-full overflow-x-auto">
+              <table className="w-full min-w-[900px] text-left">
                 <thead className="border-b border-gray-800 bg-gray-950">
                   <tr>
                     <th className="px-6 py-4 font-semibold text-white">Name</th>

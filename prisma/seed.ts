@@ -31,17 +31,28 @@ async function main() {
     },
   });
 
-  const monthlyPlan = await prisma.membershipPlan.upsert({
-    where: { id: 1 },
-    update: {},
-    create: {
-      tenantId: tenant.id,
-      name: "Monthly Plan",
-      durationDays: 30,
-      price: 5000,
-      status: "active",
-    },
+  const existingPlans = await prisma.plan.findMany({
+    where: { tenantId: tenant.id, status: "active" },
+    select: { id: true, durationDays: true },
   });
+
+  if (existingPlans.length === 0) {
+    await prisma.plan.createMany({
+      data: [
+        { tenantId: tenant.id, name: "Weekly Pass", durationDays: 7, price: 2500, status: "active" },
+        { tenantId: tenant.id, name: "Monthly Standard", durationDays: 30, price: 5000, status: "active" },
+        { tenantId: tenant.id, name: "3 Month Standard", durationDays: 90, price: 12000, status: "active" },
+        { tenantId: tenant.id, name: "6 Month Standard", durationDays: 180, price: 22000, status: "active" },
+        { tenantId: tenant.id, name: "1 Year Standard", durationDays: 365, price: 40000, status: "active" },
+      ],
+    });
+  }
+
+  const plans = await prisma.plan.findMany({
+    where: { tenantId: tenant.id, status: "active" },
+    orderBy: { durationDays: "asc" },
+  });
+  const monthlyPlan = plans.find((plan) => plan.durationDays === 30) ?? plans[0];
 
   await prisma.member.createMany({
     data: [

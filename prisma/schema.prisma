@@ -16,9 +16,10 @@ model Tenant {
   updatedAt     DateTime         @updatedAt
 
   users         User[]
+  fileUploads   FileUpload[]
   subscriptions Subscription[]
   members       Member[]
-  plans         MembershipPlan[]
+  plans         Plan[]
   memberships   MemberMembership[]
   payments      Payment[]
   attendance    Attendance[]
@@ -35,6 +36,7 @@ model User {
   updatedAt    DateTime @updatedAt
 
   tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fileUploads  FileUpload[]
 
   @@index([tenantId])
 }
@@ -73,7 +75,7 @@ model Member {
   @@index([tenantId])
 }
 
-model MembershipPlan {
+model Plan {
   id           Int      @id @default(autoincrement())
   tenantId     Int
   name         String
@@ -87,6 +89,7 @@ model MembershipPlan {
   memberships  MemberMembership[]
 
   @@index([tenantId])
+  @@map("plans")
 }
 
 model MemberMembership {
@@ -102,7 +105,7 @@ model MemberMembership {
 
   tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   member    Member         @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  plan      MembershipPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  plan      Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([memberId])
@@ -140,4 +143,24 @@ model Attendance {
 
   @@index([tenantId])
   @@index([memberId])
+}
+
+model FileUpload {
+  id          Int      @id @default(autoincrement())
+  tenantId    Int
+  uploadedBy  Int
+  entityType  String
+  entityId    Int?
+  fileName    String
+  filePath    String
+  mimeType    String
+  fileSize    Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([entityType, entityId])
 }

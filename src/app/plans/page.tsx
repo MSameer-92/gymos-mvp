@@ -1,6 +1,6 @@
 import { PlanForm } from "@/components/PlanForm";
 import { requireUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { ensureDefaultPlans } from "@/lib/default-plans";
 import { Package } from "lucide-react";
 
 function StatusBadge({ status }: { status: string }) {
@@ -22,13 +22,10 @@ function StatusBadge({ status }: { status: string }) {
 
 export default async function PlansPage() {
   const user = await requireUser();
-  const plans = await prisma.membershipPlan.findMany({
-    where: { tenantId: user.tenantId },
-    orderBy: { createdAt: "desc" },
-  });
+  const plans = await ensureDefaultPlans(user.tenantId);
 
   return (
-    <div className="relative z-10 min-h-screen bg-transparent p-6 -m-6 space-y-8">
+    <div className="w-full space-y-8">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-white">Membership Plans</h1>

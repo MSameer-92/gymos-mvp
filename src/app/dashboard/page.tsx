@@ -1,6 +1,7 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getGymSettings } from "@/lib/gym-settings";
 import { PremiumDashboardClient } from "./PremiumDashboardClient";
 
 export const dynamic = "force-dynamic";
@@ -9,14 +10,21 @@ export const revalidate = 0;
 export default async function DashboardPage() {
   noStore();
   const user = await requireUser();
+  const settings = await getGymSettings(user.tenantId);
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const monthStart = new Date();
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
-  const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+  const inactiveCutoff = new Date(Date.now() - settings.alertRules.inactiveMemberDays * 24 * 60 * 60 * 1000);
   const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-  const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const expiringCutoff = new Date(Date.now() + settings.alertRules.expiringSoonDays * 24 * 60 * 60 * 1000);
+  const collectDueWhere = {
+    tenantId: user.tenantId,
+    paymentStatus: {
+      not: "paid",
+    },
+  } as const;
 
   const [
     totalMembers,
@@ -24,9 +32,11 @@ export default async function DashboardPage() {
     revenueThisMonth,
     todayAttendance,
     expiringSoon,
+    collectDueCountRaw,
+    collectDueAmountRaw,
+    memberships,
     recentMembers,
     subscription,
-    inactiveMemberCount,
     checkInsThisMonth,
   ] =
     await Promise.all([
@@ -49,9 +59,34 @@ export default async function DashboardPage() {
           status: "active",
           endDate: {
             gte: new Date(),
-            lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            lte: expiringCutoff,
           },
         },
+      }),
+      prisma.payment.count({
+        where: collectDueWhere,
+      }),
+      prisma.payment.aggregate({
+        where: collectDueWhere,
+        _sum: { amount: true },
+      }),
+      prisma.memberMembership.findMany({
+        where: { tenantId: user.tenantId },
+        select: {
+          memberId: true,
+          endDate: true,
+          createdAt: true,
+          plan: {
+            select: {
+              price: true,
+            },
+          },
+        },
+        orderBy: [
+          { memberId: "asc" },
+          { endDate: "desc" },
+          { createdAt: "desc" },
+        ],
       }),
       prisma.member.findMany({
         where: { tenantId: user.tenantId },
@@ -60,7 +95,7 @@ export default async function DashboardPage() {
           name: true,
           status: true,
           attendance: {
-            where: { checkInAt: { gte: fourteenDaysAgo } },
+            where: { checkInAt: { gte: inactiveCutoff } },
             select: { id: true },
             take: 1,
           },
@@ -84,21 +119,27 @@ export default async function DashboardPage() {
         where: { tenantId: user.tenantId },
         orderBy: { createdAt: "desc" },
       }),
-      prisma.member.count({
-        where: { tenantId: user.tenantId, status: "inactive" },
-      }),
       prisma.attendance.count({
         where: { tenantId: user.tenantId, checkInAt: { gte: monthStart } },
       }),
     ]);
 
+  const latestMembershipByMember = new Map<
+    number,
+    (typeof memberships)[number] | null
+  >();
+  for (const membership of memberships) {
+    if (!latestMembershipByMember.has(membership.memberId)) {
+      latestMembershipByMember.set(membership.memberId, membership);
+    }
+  }
+
   const activeWindow = recentMembers.map((member) => {
-    const latestMembership = member.memberships[0] ?? null;
+    const latestMembership = latestMembershipByMember.get(member.id) ?? member.memberships[0] ?? null;
     const hasRecentAttendance = member.attendance.length > 0;
     const isExpiringSoon =
-      !!latestMembership && latestMembership.endDate >= todayStart && latestMembership.endDate <= sevenDaysFromNow;
-    const isOverdue =
-      !!latestMembership && latestMembership.endDate < todayStart;
+      !!latestMembership && latestMembership.endDate >= todayStart && latestMembership.endDate <= expiringCutoff;
+    const isOverdue = !!latestMembership && latestMembership.endDate < todayStart;
     const isInactive = !hasRecentAttendance;
     const isRecoverable =
       !!latestMembership &&
@@ -117,8 +158,10 @@ export default async function DashboardPage() {
   });
 
   const overduePayments = activeWindow.filter((member) => member.isOverdue).length;
-  const inactiveMembers = inactiveMemberCount;
+  const inactiveMembers = activeWindow.filter((member) => member.isInactive).length;
   const lowStockItems = expiringSoon;
+  const collectDueCount = collectDueCountRaw > 0 ? collectDueCountRaw : overduePayments;
+  const collectDueAmount = Number(collectDueAmountRaw._sum.amount ?? 0);
   const coachHoursThisMonth = checkInsThisMonth;
 
   const recoverableRevenue = activeWindow.reduce((sum, member) => {
@@ -130,7 +173,7 @@ export default async function DashboardPage() {
     {
       label: "Expiring Soon",
       value: expiringSoon,
-      description: "Members whose plans end within 7 days.",
+      description: `Members whose plans end within ${settings.alertRules.expiringSoonDays} days.`,
       action: "Review members",
       href: "/members",
     },
@@ -138,13 +181,13 @@ export default async function DashboardPage() {
       label: "Overdue Payments",
       value: overduePayments,
       description: "Members whose latest membership has expired.",
-      action: "Collect dues",
-      href: "/payments",
+      action: "Review overdue",
+      href: "/reports",
     },
     {
       label: "Inactive Members",
       value: inactiveMembers,
-      description: "Members with no check-in in the last 14 days.",
+      description: `Members with no check-in in the last ${settings.alertRules.inactiveMemberDays} days.`,
       action: "View activity",
       href: "/attendance",
     },
@@ -154,6 +197,13 @@ export default async function DashboardPage() {
       description: "Inventory warnings are not modeled yet in this MVP.",
       action: "Open inventory",
       href: "/inventory",
+    },
+    {
+      label: "Collect Due",
+      value: collectDueCount,
+      description: "Pending member dues.",
+      action: "Collect dues",
+      href: "/payments",
     },
   ];
 
@@ -170,6 +220,8 @@ export default async function DashboardPage() {
       overduePayments={overduePayments}
       inactiveMembers={inactiveMembers}
       lowStockItems={lowStockItems}
+      collectDueCount={collectDueCount}
+      collectDueAmount={collectDueAmount}
       coachHoursThisMonth={coachHoursThisMonth}
       recoverableRevenue={recoverableRevenue}
       attentionItems={attentionItems}
