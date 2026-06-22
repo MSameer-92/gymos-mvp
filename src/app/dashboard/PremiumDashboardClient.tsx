@@ -2,6 +2,9 @@
 
 import React, { useEffect, useState } from "react";
 import { ArrowRight, Activity, Clock, Package, TrendingUp, UserCheck, Users, UserMinus, X } from "lucide-react";
+import gsap from "gsap";
+import { motion } from "framer-motion";
+import DashboardClient from "./DashboardClient";
 import {
   AreaChart,
   Area,
@@ -16,6 +19,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import AnimatedCounter from "@/components/AnimatedCounter";
 
 type KpiTooltipProps = {
   active?: boolean;
@@ -47,6 +51,7 @@ function StatCard({
   index,
   label,
   value,
+  secondary,
   icon,
   iconBg,
   iconColor,
@@ -54,25 +59,34 @@ function StatCard({
   index: number;
   label: string;
   value: string | number;
+  secondary?: React.ReactNode;
   icon: React.ReactNode;
   iconBg: string;
   iconColor: string;
 }) {
+  const numericValue = typeof value === "number" ? value : null;
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: index * 0.1 }}
+      whileHover={{ y: -4, transition: { duration: 0.2 } }}
       className="relative overflow-hidden rounded-2xl border border-gray-800 bg-gray-900 p-6 hover:border-purple-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/10 hover:-translate-y-1 animate-rise"
       style={{ animationDelay: `${index * 90}ms` }}
     >
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-gray-400 text-sm font-medium">{label}</p>
-          <p className="mt-2 text-white text-3xl font-black">{value}</p>
+          <p className="mt-2 text-white text-3xl font-black">
+            {numericValue !== null ? <AnimatedCounter value={numericValue} /> : value}
+          </p>
+          {secondary ? <div className="mt-2 space-y-1 text-sm text-gray-400">{secondary}</div> : null}
         </div>
         <div className={`h-12 w-12 shrink-0 rounded-xl flex items-center justify-center ${iconBg} border border-gray-800`}>
           <div className={iconColor}>{icon}</div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -143,7 +157,9 @@ export function PremiumDashboardClient({
   expiringSoon,
   revenueThisMonth,
   todayAttendance,
+  expiringSoonNext,
   overduePayments,
+  overdueOldestDays,
   inactiveMembers,
   lowStockItems,
   collectDueCount,
@@ -160,7 +176,9 @@ export function PremiumDashboardClient({
   expiringSoon: number;
   revenueThisMonth: number;
   todayAttendance: number;
+  expiringSoonNext: { memberName: string; dateLabel: string } | null;
   overduePayments: number;
+  overdueOldestDays: number;
   inactiveMembers: number;
   lowStockItems: number;
   collectDueCount: number;
@@ -206,12 +224,47 @@ export function PremiumDashboardClient({
     if (!deactivateModalOpen) return;
     setSelectedMemberId(null);
   }, [deactivateModalOpen]);
+
+  useEffect(() => {
+    const cards = gsap.utils.toArray<HTMLElement>(".attention-card");
+
+    gsap.fromTo(
+      cards,
+      { y: 40, opacity: 0 },
+      { y: 0, opacity: 1, duration: 0.6, stagger: 0.15, ease: "power2.out" }
+    );
+
+    cards.forEach((card) => {
+      const countEl = card.querySelector<HTMLElement>(".attention-count");
+      if (!countEl) return;
+
+      const target = Number(countEl.dataset.value ?? countEl.textContent ?? 0);
+      if (!Number.isFinite(target) || target <= 0) {
+        countEl.textContent = "0";
+        return;
+      }
+
+      const counter = { value: 0 };
+      countEl.textContent = "0";
+
+      gsap.to(counter, {
+        value: target,
+        duration: 1,
+        ease: "power2.out",
+        snap: { value: 1 },
+        onUpdate: () => {
+          countEl.textContent = String(counter.value);
+        },
+      });
+    });
+  }, []);
+
   const isTrial = subscription?.status === "trial" || subscription?.planName === "Starter" || subscription?.status === "Trial";
   const kpiChartData = [
     { name: "Members", value: activeMembers, fill: "#a855f7" },
     { name: "Attendance", value: todayAttendance, fill: "#ef4444" },
     { name: "Expiring", value: expiringSoon, fill: "#10b981" },
-    { name: "Overdue", value: overduePayments, fill: "#f97316" },
+    { name: "Overdue Members", value: overduePayments, fill: "#f97316" },
     { name: "Inactive", value: inactiveMembers, fill: "#06b6d4" },
     { name: "Stock", value: lowStockItems, fill: "#ec4899" },
     { name: "Collect Due", value: collectDueCount, fill: "#8b5cf6" },
@@ -263,8 +316,20 @@ export function PremiumDashboardClient({
         />
         <StatCard
           index={3}
-          label="Overdue Payments"
+          label="Overdue Members"
           value={overduePayments}
+          secondary={
+            overduePayments === 0 ? (
+              <p className="text-emerald-400">All caught up ✅</p>
+            ) : (
+              <div className="space-y-1">
+                <p>Oldest: {overdueOldestDays} days</p>
+                <a href="/members?filter=overdue" className="inline-flex text-gray-400 transition-colors hover:text-white">
+                  Send reminders →
+                </a>
+              </div>
+            )
+          }
           icon={<Clock className="h-6 w-6" />}
           iconBg="bg-orange-500/20"
           iconColor="text-orange-400"
@@ -273,6 +338,15 @@ export function PremiumDashboardClient({
           index={4}
           label="Expiring Soon"
           value={expiringSoon}
+          secondary={
+            expiringSoonNext ? (
+              <p>
+                Next: {expiringSoonNext.memberName} on {expiringSoonNext.dateLabel}
+              </p>
+            ) : (
+              <p>No renewals needed</p>
+            )
+          }
           icon={<Clock className="h-6 w-6" />}
           iconBg="bg-emerald-500/20"
           iconColor="text-emerald-400"
@@ -281,6 +355,11 @@ export function PremiumDashboardClient({
           index={5}
           label="Inactive Members"
           value={inactiveMembers}
+          secondary={
+            <a href="/members?filter=inactive" className="inline-flex text-gray-400 transition-colors hover:text-white">
+              View List →
+            </a>
+          }
           icon={<UserCheck className="h-6 w-6" />}
           iconBg="bg-cyan-500/20"
           iconColor="text-cyan-400"
@@ -305,6 +384,14 @@ export function PremiumDashboardClient({
           index={8}
           label="Collect Due"
           value={collectDueDisplay}
+          secondary={
+            <div className="space-y-1">
+              <p>Total: Rs {Number(collectDueAmount).toLocaleString()}</p>
+              <a href="/payments" className="inline-flex text-gray-400 transition-colors hover:text-white">
+                Collect →
+              </a>
+            </div>
+          }
           icon={<Clock className="h-6 w-6" />}
           iconBg="bg-violet-500/20"
           iconColor="text-violet-400"
@@ -325,7 +412,7 @@ export function PremiumDashboardClient({
               <p className="mt-1 text-sm text-gray-400">A quick visual of the current dashboard metrics.</p>
             </div>
           </div>
-          <div className="h-72">
+          <motion.div className="h-80 w-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={kpiChartData} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
@@ -342,7 +429,7 @@ export function PremiumDashboardClient({
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
-          </div>
+          </motion.div>
         </div>
 
         <div className="rounded-2xl border border-gray-800 bg-gray-900 p-6">
@@ -350,7 +437,7 @@ export function PremiumDashboardClient({
             <h3 className="text-lg font-bold text-white">Revenue Trend</h3>
             <p className="mt-1 text-sm text-gray-400">Current revenue versus recoverable revenue.</p>
           </div>
-          <div className="h-72">
+          <motion.div className="h-80 w-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={revenueChartData} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
                 <defs>
@@ -373,50 +460,10 @@ export function PremiumDashboardClient({
                 <Area type="monotone" dataKey="value" stroke="#a855f7" fill="url(#revenueGradient)" strokeWidth={3} />
               </AreaChart>
             </ResponsiveContainer>
-          </div>
+          </motion.div>
         </div>
 
-        <div className="rounded-2xl border border-gray-800 bg-gray-900 p-6 xl:col-span-3">
-          <div className="mb-5 flex items-center justify-between gap-4">
-            <div>
-              <h3 className="text-lg font-bold text-white">Attention Mix</h3>
-              <p className="mt-1 text-sm text-gray-400">How your attention queue is distributed right now.</p>
-            </div>
-          </div>
-          <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={alertChartData} dataKey="value" nameKey="name" innerRadius={70} outerRadius={110} paddingAngle={4}>
-                    {alertChartData.map((entry) => (
-                      <Cell key={entry.name} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#0f172a",
-                      border: "1px solid #1f2937",
-                      borderRadius: "12px",
-                      color: "#fff",
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {alertChartData.map((item) => (
-                <div key={item.name} className="rounded-xl border border-gray-800 bg-gray-950/40 p-4">
-                  <div className="flex items-center gap-3">
-                    <span className="h-3 w-3 rounded-full" style={{ backgroundColor: item.fill }} />
-                    <p className="text-sm font-semibold text-white">{item.name}</p>
-                  </div>
-                  <p className="mt-3 text-2xl font-black text-white">{item.value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        <DashboardClient attentionItems={attentionItems} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
@@ -460,7 +507,7 @@ export function PremiumDashboardClient({
                 <p className="mt-2 text-2xl font-black text-white">{expiringSoon}</p>
               </div>
               <div className="rounded-xl border border-gray-800 bg-gray-950/40 p-4">
-                <p className="text-xs font-medium text-gray-500">Overdue</p>
+                <p className="text-xs font-medium text-gray-500">Overdue Members</p>
                 <p className="mt-2 text-2xl font-black text-white">{overduePayments}</p>
               </div>
               <div className="rounded-xl border border-gray-800 bg-gray-950/40 p-4">

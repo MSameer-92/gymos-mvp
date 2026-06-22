@@ -3,6 +3,11 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
+type SeedPlan = {
+  id: number;
+  durationDays: number;
+};
+
 async function main() {
   const passwordHash = await bcrypt.hash("admin123", 10);
 
@@ -31,7 +36,7 @@ async function main() {
     },
   });
 
-  const existingPlans = await prisma.plan.findMany({
+  const existingPlans: SeedPlan[] = await prisma.plan.findMany({
     where: { tenantId: tenant.id, status: "active" },
     select: { id: true, durationDays: true },
   });
@@ -48,11 +53,11 @@ async function main() {
     });
   }
 
-  const plans = await prisma.plan.findMany({
+  const plans: Array<SeedPlan & { name: string; price: unknown; status: string }> = await prisma.plan.findMany({
     where: { tenantId: tenant.id, status: "active" },
     orderBy: { durationDays: "asc" },
   });
-  const monthlyPlan = plans.find((plan) => plan.durationDays === 30) ?? plans[0];
+  const monthlyPlan = plans.find((plan: SeedPlan) => plan.durationDays === 30) ?? plans[0];
 
   await prisma.member.createMany({
     data: [

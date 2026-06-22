@@ -18,20 +18,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Member, plan, start date, and end date are required" }, { status: 400 });
   }
 
-  await ensureDefaultPlans(user.tenantId);
-
-  const [member, plan] = await Promise.all([
-    prisma.member.findFirst({
-      where: { id: memberId, tenantId: user.tenantId },
-      select: { id: true },
-    }),
-    prisma.plan.findFirst({
-      where: { id: planId, tenantId: user.tenantId },
-      select: { id: true },
-    }),
-  ]);
+  const member = await prisma.member.findFirst({
+    where: { id: memberId, tenantId: user.tenantId },
+    select: { id: true, tenantId: true },
+  });
 
   if (!member) return NextResponse.json({ error: "Member not found" }, { status: 404 });
+
+  await ensureDefaultPlans(member.tenantId);
+
+  const plan = await prisma.plan.findFirst({
+    where: { id: planId, tenantId: member.tenantId, status: "active" },
+    select: { id: true },
+  });
+
   if (!plan) return NextResponse.json({ error: "Plan not found" }, { status: 404 });
 
   const startDate = new Date(`${startDateRaw}T00:00:00`);
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
 
   await prisma.memberMembership.create({
     data: {
-      tenantId: user.tenantId,
+      tenantId: member.tenantId,
       memberId: member.id,
       planId: plan.id,
       startDate,
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
   });
 
   await prisma.member.updateMany({
-    where: { id: member.id, tenantId: user.tenantId },
+    where: { id: member.id, tenantId: member.tenantId },
     data: { status },
   });
 

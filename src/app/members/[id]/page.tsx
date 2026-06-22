@@ -115,37 +115,41 @@ export default async function MemberDetailPage({
   const { id } = await params;
   const memberId = Number(id);
 
-  const [member, plansResult, payments, attendance] = await Promise.all([
-    prisma.member.findFirst({
-      where: { id: memberId, tenantId: user.tenantId },
-      include: {
-        memberships: {
-          orderBy: [{ endDate: "desc" }, { createdAt: "desc" }],
-          include: {
-            plan: true,
-          },
-          take: 1,
+  const member = await prisma.member.findFirst({
+    where: { id: memberId, tenantId: user.tenantId },
+    include: {
+      memberships: {
+        orderBy: [{ endDate: "desc" }, { createdAt: "desc" }],
+        include: {
+          plan: true,
         },
+        take: 1,
       },
-    }),
-    ensureDefaultPlans(user.tenantId),
-    prisma.payment.findMany({
-      where: { tenantId: user.tenantId, memberId },
-      orderBy: { createdAt: "desc" },
-      take: 12,
-    }),
-    prisma.attendance.findMany({
-      where: { tenantId: user.tenantId, memberId },
-      orderBy: { checkInAt: "desc" },
-      take: 12,
-    }),
-  ]);
+    },
+  });
 
   if (!member) {
     notFound();
   }
 
-  const rawPlans = plansResult.map((plan) => ({
+  console.log("DEBUG: User tenantId:", user.tenantId);
+  console.log("DEBUG: Member tenantId:", member.tenantId);
+
+  const [plansResult, payments, attendance] = await Promise.all([
+    ensureDefaultPlans(member.tenantId),
+    prisma.payment.findMany({
+      where: { tenantId: member.tenantId, memberId },
+      orderBy: { createdAt: "desc" },
+      take: 12,
+    }),
+    prisma.attendance.findMany({
+      where: { tenantId: member.tenantId, memberId },
+      orderBy: { checkInAt: "desc" },
+      take: 12,
+    }),
+  ]);
+
+  const rawPlans = plansResult.map((plan: { id: number; name: string; durationDays: number; price: unknown }) => ({
     id: String(plan.id),
     name: String(plan.name),
     durationDays: Number(plan.durationDays),
