@@ -8,5 +8,5 @@ export function Field({ label, children }: { label: string; children: React.Reac
 }
 
 export const inputClass =
-  "flex h-10 w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:border-purple-500 disabled:cursor-not-allowed disabled:opacity-50";
+  "w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 pl-11 text-white placeholder:text-slate-500 shadow-inner shadow-black/20 outline-none transition focus:border-cyan-400/70 focus:bg-slate-900/80 focus:ring-2 focus:ring-cyan-400/20";
 

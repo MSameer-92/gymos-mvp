@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 const highlights = [
   "Real-time member tracking",
   "Automated billing and reminders",
@@ -30,6 +32,24 @@ export function AuthCard({
               <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.25em] text-cyan-100">
                 <span className="h-2 w-2 rounded-full bg-cyan-300 animate-pulse" />
                 GymOS Pro
+              </div>
+
+              <div className="relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-slate-950/40">
+                <div className="relative h-[300px] w-full">
+                  <Image
+                    src="/images/gym-trainer-hero.png"
+                    alt="Gym trainer using GymOS"
+                    fill
+                    className="object-cover"
+                    priority
+                  />
+                  <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(3,7,18,0.9),rgba(3,7,18,0.1))]" />
+                </div>
+                <div className="absolute bottom-4 left-4 right-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-cyan-100/80">
+                    Premium gym operations
+                  </p>
+                </div>
               </div>
 
               <div className="max-w-xl space-y-5">

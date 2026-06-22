@@ -4,63 +4,14 @@ import { revalidatePath } from "next/cache";
 import { ArrowLeft, Calendar, CreditCard, History, Medal, Phone, UserCheck, Users } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { Field, inputClass } from "@/components/Field";
+import { AssignPlan } from "@/components/AssignPlan";
+import { recordAttendance } from "@/lib/attendance";
+import { SendMessageDialog } from "./SendMessageDialog";
+import { ensureDefaultPlans } from "@/lib/default-plans";
+
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-async function assignOrRenewPlan(formData: FormData) {
-  "use server";
-
-  const user = await requireUser();
-  const memberId = Number(formData.get("memberId"));
-  const planId = Number(formData.get("planId"));
-
-  if (!memberId || !planId) {
-    redirect(`/members/${memberId}`);
-  }
-
-  const [member, plan] = await Promise.all([
-    prisma.member.findFirst({
-      where: { id: memberId, tenantId: user.tenantId },
-      select: { id: true },
-    }),
-    prisma.membershipPlan.findFirst({
-      where: { id: planId, tenantId: user.tenantId },
-      select: { id: true, durationDays: true },
-    }),
-  ]);
-
-  if (!member || !plan) {
-    notFound();
-  }
-
-  const startDate = new Date();
-  const endDate = new Date(startDate);
-  endDate.setDate(endDate.getDate() + plan.durationDays);
-
-  await prisma.memberMembership.create({
-    data: {
-      tenantId: user.tenantId,
-      memberId: member.id,
-      planId: plan.id,
-      startDate,
-      endDate,
-      status: "active",
-    },
-  });
-
-  await prisma.member.updateMany({
-    where: { id: member.id, tenantId: user.tenantId },
-    data: { status: "active" },
-  });
-
-  revalidatePath(`/members/${member.id}`);
-  revalidatePath("/members");
-  revalidatePath("/dashboard");
-  revalidatePath("/plans");
-  redirect(`/members/${member.id}`);
-}
 
 async function markAttendance(formData: FormData) {
   "use server";
@@ -81,12 +32,7 @@ async function markAttendance(formData: FormData) {
     notFound();
   }
 
-  await prisma.attendance.create({
-    data: {
-      tenantId: user.tenantId,
-      memberId: member.id,
-    },
-  });
+  await recordAttendance({ id: member.id, tenantId: user.tenantId });
 
   revalidatePath(`/members/${member.id}`);
   revalidatePath("/attendance");
@@ -94,22 +40,49 @@ async function markAttendance(formData: FormData) {
   redirect(`/members/${member.id}`);
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const variants: Record<string, { bg: string; text: string; label: string }> = {
-    Active: { bg: "bg-emerald-500/15", text: "text-emerald-300", label: "Active" },
-    "Expiring Soon": { bg: "bg-amber-500/15", text: "text-amber-300", label: "Expiring Soon" },
-    Expired: { bg: "bg-red-500/15", text: "text-red-300", label: "Expired" },
-    "No Plan": { bg: "bg-slate-500/15", text: "text-slate-300", label: "No Plan" },
+function formatPlanDisplayName(planName: unknown) {
+  const name = typeof planName === "string" ? planName.trim() : "";
+
+  // Defensive fallback for broken/seeded username-like values.
+  return name === "Bilal" || !name ? "Standard Membership" : name;
+}
+
+function formatDateMMDDYYYY(value: unknown) {
+  const date = value instanceof Date ? value : value ? new Date(value as string) : null;
+  if (!date || Number.isNaN(date.getTime())) return "-";
+
+  // Output in MM/dd/yyyy to keep UI uniformity without requiring date-fns.
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const yyyy = date.getFullYear();
+  return `${mm}/${dd}/${yyyy}`;
+}
+
+function getDaysLeft({ endDate }: { endDate: Date }) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const end = endDate;
+  return Math.ceil((end.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+}
+
+function StatusBadge({ label, tone }: { label: string; tone: "active" | "expiring" | "expired" | "none" }) {
+  const variants: Record<string, { bg: string; text: string }> = {
+    active: { bg: "bg-emerald-500/15", text: "text-emerald-300" },
+    expiring: { bg: "bg-amber-500/15", text: "text-amber-300" },
+    expired: { bg: "bg-red-500/15", text: "text-red-300" },
+    none: { bg: "bg-slate-500/15", text: "text-slate-300" },
   };
 
-  const variant = variants[status] ?? variants["No Plan"];
+  const variant = variants[tone] ?? variants.none;
 
   return (
     <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${variant.bg} ${variant.text}`}>
-      {variant.label}
+      {label}
     </span>
   );
 }
+
 
 function StatCard({
   icon,
@@ -142,57 +115,91 @@ export default async function MemberDetailPage({
   const { id } = await params;
   const memberId = Number(id);
 
-  const [member, plans, payments, attendance] = await Promise.all([
-    prisma.member.findFirst({
-      where: { id: memberId, tenantId: user.tenantId },
-      include: {
-        memberships: {
-          orderBy: { endDate: "desc" },
-          include: {
-            plan: true,
-          },
-          take: 1,
+  const member = await prisma.member.findFirst({
+    where: { id: memberId, tenantId: user.tenantId },
+    include: {
+      memberships: {
+        orderBy: [{ endDate: "desc" }, { createdAt: "desc" }],
+        include: {
+          plan: true,
         },
+        take: 1,
       },
-    }),
-    prisma.membershipPlan.findMany({
-      where: { tenantId: user.tenantId, status: "active" },
-      orderBy: { name: "asc" },
-    }),
-    prisma.payment.findMany({
-      where: { tenantId: user.tenantId, memberId },
-      orderBy: { createdAt: "desc" },
-      take: 12,
-    }),
-    prisma.attendance.findMany({
-      where: { tenantId: user.tenantId, memberId },
-      orderBy: { checkInAt: "desc" },
-      take: 12,
-    }),
-  ]);
+    },
+  });
 
   if (!member) {
     notFound();
   }
 
-  const currentMembership = member.memberships[0] ?? null;
-  const now = new Date();
-  const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  console.log("DEBUG: User tenantId:", user.tenantId);
+  console.log("DEBUG: Member tenantId:", member.tenantId);
 
-  const membershipStatus = !currentMembership
-    ? "No Plan"
-    : currentMembership.endDate < now
-      ? "Expired"
-      : currentMembership.endDate <= sevenDaysFromNow
-        ? "Expiring Soon"
-        : "Active";
+  const [plansResult, payments, attendance] = await Promise.all([
+    ensureDefaultPlans(member.tenantId),
+    prisma.payment.findMany({
+      where: { tenantId: member.tenantId, memberId },
+      orderBy: { createdAt: "desc" },
+      take: 12,
+    }),
+    prisma.attendance.findMany({
+      where: { tenantId: member.tenantId, memberId },
+      orderBy: { checkInAt: "desc" },
+      take: 12,
+    }),
+  ]);
+
+  const rawPlans = plansResult.map((plan: { id: number; name: string; durationDays: number; price: unknown }) => ({
+    id: String(plan.id),
+    name: String(plan.name),
+    durationDays: Number(plan.durationDays),
+    price: Number(plan.price),
+  }));
+
+  const plans = Array.from(
+    new Map(
+      rawPlans.map((plan) => [
+        `${plan.name.trim().toLowerCase()}-${plan.durationDays}-${plan.price}`,
+        plan,
+      ]),
+    ).values(),
+  ).sort((a, b) => a.durationDays - b.durationDays);
+
+  const currentMembership = member.memberships[0] ?? null;
+  const latestPayment = payments[0] ?? null;
 
   const remainingDays = currentMembership
-    ? Math.ceil((currentMembership.endDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))
+    ? getDaysLeft({ endDate: currentMembership.endDate })
     : null;
 
+  const sendMessageContext = {
+    memberName: member.name,
+    memberPhone: member.phone,
+    amount: Number(currentMembership?.plan?.price ?? latestPayment?.amount ?? 0),
+    planName: formatPlanDisplayName(currentMembership?.plan?.name ?? "Standard Membership"),
+    expiryDate: currentMembership?.endDate ? formatDateMMDDYYYY(currentMembership.endDate) : "-",
+  };
+
+  const membershipStatusTone: "active" | "expiring" | "expired" | "none" =
+    !currentMembership || remainingDays == null
+      ? "none"
+      : remainingDays <= 0
+        ? "expired"
+        : remainingDays <= 7
+          ? "expiring"
+          : "active";
+
+  const membershipStatusLabel =
+    membershipStatusTone === "active"
+      ? "Active"
+      : membershipStatusTone === "expiring"
+        ? "Expiring Soon"
+        : membershipStatusTone === "expired"
+          ? "Expired"
+          : "No Plan";
+
   return (
-    <div className="relative z-10 min-h-screen bg-transparent p-6 -m-6 space-y-8">
+    <div className="w-full space-y-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-3">
           <Link
@@ -227,12 +234,19 @@ export default async function MemberDetailPage({
             <input type="hidden" name="memberId" value={member.id} />
             <button
               type="submit"
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 text-sm font-semibold text-gray-200 transition-colors hover:bg-gray-800"
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-700 bg-gray-900 px-4 py-3 text-sm font-semibold text-gray-200 transition-colors hover:bg-gray-800"
             >
               <UserCheck className="h-4 w-4" />
               Mark Attendance
             </button>
           </form>
+          <SendMessageDialog
+            memberName={sendMessageContext.memberName}
+            memberPhone={sendMessageContext.memberPhone}
+            amount={sendMessageContext.amount}
+            planName={sendMessageContext.planName}
+            expiryDate={sendMessageContext.expiryDate}
+          />
         </div>
       </div>
 
@@ -243,7 +257,7 @@ export default async function MemberDetailPage({
             <StatCard icon={<Phone className="h-5 w-5 text-emerald-400" />} label="Email" value={member.email ?? "-"} />
             <StatCard icon={<Calendar className="h-5 w-5 text-blue-400" />} label="Joining Date" value={member.joiningDate.toLocaleDateString()} />
             <StatCard icon={<History className="h-5 w-5 text-amber-400" />} label="Gender" value={member.gender ?? "-"} />
-            <StatCard icon={<UserCheck className="h-5 w-5 text-pink-400" />} label="Status" value={<StatusBadge status={membershipStatus} />} />
+            <StatCard icon={<UserCheck className="h-5 w-5 text-pink-400" />} label="Status" value={<StatusBadge label={membershipStatusLabel} tone={membershipStatusTone} />} />
             <StatCard icon={<Calendar className="h-5 w-5 text-cyan-400" />} label="Remaining Days" value={remainingDays == null ? "No Plan" : `${remainingDays} days`} />
           </div>
 
@@ -253,22 +267,30 @@ export default async function MemberDetailPage({
                 <h2 className="text-lg font-bold text-white">Current Membership</h2>
                 <p className="mt-1 text-sm text-gray-400">Latest active or recently expired plan on this member.</p>
               </div>
-              <StatusBadge status={membershipStatus} />
+              <div className="flex items-center">
+                <StatusBadge label={membershipStatusLabel} tone={membershipStatusTone} />
+              </div>
             </div>
 
             {currentMembership ? (
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="rounded-xl border border-gray-800 bg-gray-950/40 p-4">
                   <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Plan</p>
-                  <p className="mt-1 text-sm font-semibold text-white">{currentMembership.plan.name}</p>
+                  <p className="mt-1 text-sm font-semibold text-white">
+                    {formatPlanDisplayName(currentMembership.plan?.name)}
+                  </p>
                 </div>
                 <div className="rounded-xl border border-gray-800 bg-gray-950/40 p-4">
                   <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Start Date</p>
-                  <p className="mt-1 text-sm font-semibold text-white">{currentMembership.startDate.toLocaleDateString()}</p>
+                  <p className="mt-1 text-sm font-semibold text-white">
+                    {formatDateMMDDYYYY(currentMembership.startDate)}
+                  </p>
                 </div>
                 <div className="rounded-xl border border-gray-800 bg-gray-950/40 p-4">
                   <p className="text-xs font-medium uppercase tracking-wide text-gray-500">End Date</p>
-                  <p className="mt-1 text-sm font-semibold text-white">{currentMembership.endDate.toLocaleDateString()}</p>
+                  <p className="mt-1 text-sm font-semibold text-white">
+                    {formatDateMMDDYYYY(currentMembership.endDate)}
+                  </p>
                 </div>
                 <div className="rounded-xl border border-gray-800 bg-gray-950/40 p-4">
                   <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Days Left</p>
@@ -358,34 +380,7 @@ export default async function MemberDetailPage({
         </div>
 
         <div className="space-y-6">
-          <form
-            id="assign-plan"
-            action={assignOrRenewPlan}
-            className="rounded-2xl border border-gray-800 bg-gray-900 p-6 shadow-none"
-          >
-            <div className="mb-5">
-              <h2 className="text-lg font-bold text-white">Assign / Renew Plan</h2>
-              <p className="mt-1 text-sm text-gray-400">Use an existing plan for this member.</p>
-            </div>
-
-            <input type="hidden" name="memberId" value={member.id} />
-            <div className="space-y-4">
-              <Field label="Membership Plan">
-                <select className={inputClass} name="planId" required defaultValue="">
-                  <option value="">Choose a plan</option>
-                  {plans.map((plan) => (
-                    <option key={plan.id} value={plan.id}>
-                      {plan.name} - PKR {Number(plan.price).toLocaleString()} / {plan.durationDays} days
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <button className="w-full rounded-lg bg-purple-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-purple-500">
-                Assign / Renew Plan
-              </button>
-            </div>
-          </form>
+          <AssignPlan memberId={member.id} plans={plans} />
         </div>
       </div>
     </div>

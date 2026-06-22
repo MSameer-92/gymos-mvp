@@ -46,7 +46,7 @@ export default async function PaymentsPage({
     .reduce((sum, p) => sum + Number(p.amount), 0);
   
   return (
-    <div className="relative z-10 min-h-screen bg-transparent p-6 -m-6 space-y-8">
+    <div className="w-full space-y-8">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-white">Payments</h1>

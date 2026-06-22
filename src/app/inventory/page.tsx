@@ -6,8 +6,8 @@ export default async function InventoryPage() {
   await requireUser();
 
   return (
-    <div className="relative z-10 min-h-screen bg-transparent p-6">
-      <div className="mx-auto flex max-w-3xl flex-col gap-6 rounded-3xl border border-gray-800 bg-gray-900 p-8 shadow-none">
+    <div className="w-full">
+      <div className="w-full rounded-3xl border border-gray-800 bg-gray-900 p-8 shadow-none">
         <Link
           href="/dashboard"
           className="inline-flex items-center gap-2 text-sm font-medium text-purple-300 hover:text-purple-200"
